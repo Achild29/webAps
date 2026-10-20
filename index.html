@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Manajemen Peserta</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pt-20 pb-8 px-4 md:px-8">
+
+    <!-- Full-width Top Navigation -->
+    <nav class="bg-white border-b border-gray-200 fixed w-full z-50 top-0 left-0 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center gap-2">
+                    <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">E</div>
+                    <span class="font-bold text-xl text-slate-800">Event<span class="text-red-600">Gate</span></span>
+                </div>
+                <div class="flex space-x-2 md:space-x-4">
+                    <a href="index.html" class="bg-red-50 text-red-700 px-3 md:px-4 py-2 rounded-md text-sm font-semibold transition">Daftar Peserta</a>
+                    <a href="scanner.html" class="text-slate-600 hover:bg-slate-100 hover:text-slate-900 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition">Scanner Masuk</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header Section -->
+        <div class="bg-white rounded-t-2xl shadow-sm border-b border-gray-100 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Direktori Peserta Event</h1>
+                <p class="text-sm text-slate-500 mt-1">Kelola data dan generate QR Code KTA secara instan.</p>
+            </div>
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <span id="statusBadge" class="hidden px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full border border-green-200">Terhubung</span>
+                <button id="btnLoadData" onclick="loadData()" class="w-full md:w-auto bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-medium transition-all shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Muat Data Spreadsheet
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter, Search & Bulk Download Section -->
+        <div class="bg-white p-6 shadow-sm border-b border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div class="relative w-full md:w-96">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="text" id="searchInput" onkeyup="applyFilters()" disabled placeholder="Cari berdasarkan Nama atau KTA..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-sm">
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <label for="wilayahFilter" class="text-sm font-medium text-gray-600 whitespace-nowrap">Filter:</label>
+                    <select id="wilayahFilter" onchange="applyFilters()" disabled class="w-full md:w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed">
+                        <option value="">Semua Wilayah</option>
+                    </select>
+                </div>
+                <button id="btnBulkDownload" onclick="downloadBulkQR()" disabled class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span id="bulkDownloadText">Download ZIP (0)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="bg-white rounded-b-2xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto min-h-[400px]">
+                <table class="w-full text-left border-collapse relative">
+                    <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            <th class="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">No. KTA</th>
+                            <th class="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">Nama Peserta</th>
+                            <th class="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">Wilayah</th>
+                            <th class="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b text-center">Status Data</th>
+                            <th class="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="5" class="p-12 text-center text-gray-400 text-sm">
+                                <svg class="w-12 h-12 mx-auto text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                Data belum dimuat. Klik tombol "Muat Data Spreadsheet" di atas.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="bg-slate-50 p-4 border-t border-gray-100 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                <span id="showingText" class="text-slate-500">Menampilkan 0 dari 0 peserta</span>
+                <div class="flex items-center space-x-2">
+                    <button id="btnPrev" onclick="prevPage()" disabled class="px-3 py-1.5 border border-gray-200 rounded-md bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Sebelumnya</button>
+                    <span id="pageIndicator" class="px-3 text-slate-700 font-medium">Halaman 1 dari 1</span>
+                    <button id="btnNext" onclick="nextPage()" disabled class="px-3 py-1.5 border border-gray-200 rounded-md bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Selanjutnya</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Single QR Code -->
+    <div id="qrModal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 transition-all duration-300">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-[90%] max-w-sm">
+            <div class="text-center mb-6">
+                <div class="inline-block bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-bold mb-3 tracking-wide" id="qrKtaBadge">KTA: 0000</div>
+                <h2 class="text-xl font-bold text-slate-800 leading-tight" id="qrNamaPeserta">Nama Peserta</h2>
+                <p class="text-sm text-slate-500 mt-1" id="qrWilayah">Wilayah</p>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl mb-6 border border-slate-100 flex justify-center items-center">
+                <div id="qrcode"></div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeModal()" class="w-full bg-slate-100 text-slate-600 px-4 py-2.5 rounded-lg hover:bg-slate-200 transition font-medium text-sm">Tutup</button>
+                <button onclick="downloadQR()" class="w-full bg-red-600 text-white px-4 py-2.5 rounded-lg hover:bg-red-700 shadow-sm transition font-medium text-sm flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Simpan QR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Progress Bulk Download -->
+    <div id="progressModal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-[90%] max-w-md text-center">
+            <svg class="animate-spin w-12 h-12 text-red-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Memproses QR Code...</h2>
+            <p id="progressText" class="text-slate-600 font-medium">Menyiapkan data...</p>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-5 mb-2">
+                <div id="progressBar" class="bg-red-600 h-2.5 rounded-full" style="width: 0%; transition: width 0.1s;"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-4">Mohon jangan tutup atau refresh halaman ini selama proses berlangsung.</p>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // GANTI DENGAN URL APLIKASI WEB ANDA
+        // ==========================================
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyo1Uuvd4sRG7sdHW0CHbCrNs3lEUbNOUm8ey53oGbLRBB2K0iUYRMSrGfZrg4Nmo0J/exec'; 
+
+        let allPeserta = [];
+        let filteredPeserta = [];
+        let currentPage = 1;
+        const rowsPerPage = 50;
+
+        async function loadData() {
+            const btn = document.getElementById('btnLoadData');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memuat Data...`;
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL);
+                allPeserta = await response.json();
+                filteredPeserta = [...allPeserta];
+                currentPage = 1;
+                
+                document.getElementById('searchInput').disabled = false;
+                document.getElementById('wilayahFilter').disabled = false;
+                document.getElementById('statusBadge').classList.remove('hidden');
+                
+                populateWilayahFilter();
+                renderTable();
+            } catch (error) {
+                alert("Gagal memuat data! Periksa koneksi atau URL API Anda.");
+                console.error(error);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function populateWilayahFilter() {
+            const select = document.getElementById('wilayahFilter');
+            // Proteksi: cegah data null wilayah masuk ke filter
+            const wilayahSet = new Set(allPeserta.map(p => (p.wilayah || "").trim()).filter(w => w !== ""));
+            select.innerHTML = '<option value="">Semua Wilayah</option>';
+            Array.from(wilayahSet).sort().forEach(w => { select.innerHTML += `<option value="${w}">${w}</option>`; });
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filterWilayah = document.getElementById('wilayahFilter').value;
+            
+            filteredPeserta = allPeserta.filter(p => {
+                // BUG FIX: Proteksi null/undefined untuk nama dan kta agar toLowerCase tidak error
+                const nama = (p.nama || "").toString().toLowerCase();
+                const kta = (p.kta || "").toString().toLowerCase();
+                const wilayah = (p.wilayah || "").toString().trim();
+
+                const matchSearch = nama.includes(searchTerm) || kta.includes(searchTerm);
+                const matchWilayah = filterWilayah === "" || wilayah === filterWilayah;
+                
+                return matchSearch && matchWilayah;
+            });
+
+            currentPage = 1; 
+            renderTable();
+        }
+
+        function renderTable() {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = ''; 
+
+            const totalPages = Math.ceil(filteredPeserta.length / rowsPerPage) || 1;
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const paginatedData = filteredPeserta.slice(startIndex, endIndex);
+
+            if(filteredPeserta.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 text-sm">Tidak ada peserta yang cocok.</td></tr>`;
+            } else {
+                paginatedData.forEach(peserta => {
+                    const kta = (peserta.kta || "-").toString();
+                    const nama = (peserta.nama || "-").toString();
+                    const wilayah = (peserta.wilayah || "-").toString();
+
+                    const row = `
+                        <tr class="hover:bg-slate-50 transition-colors group">
+                            <td class="p-4 border-b text-sm font-medium text-slate-800">${kta}</td>
+                            <td class="p-4 border-b text-sm text-slate-600">${nama}</td>
+                            <td class="p-4 border-b text-sm text-slate-600">
+                                <span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs">${wilayah}</span>
+                            </td>
+                            <td class="p-4 border-b text-center">
+                                ${peserta.status_kehadiran === 'Hadir' 
+                                    ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium border border-emerald-100"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Hadir</span>' 
+                                    : '<span class="text-xs text-slate-400">Belum Hadir</span>'}
+                            </td>
+                            <td class="p-4 border-b text-right">
+                                <button onclick="showQR('${kta}', '${nama.replace(/'/g, "\\'")}', '${wilayah.replace(/'/g, "\\'")}')" class="text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                    Lihat QR
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            }
+
+            const textStart = filteredPeserta.length === 0 ? 0 : startIndex + 1;
+            const textEnd = Math.min(endIndex, filteredPeserta.length);
+            
+            document.getElementById('showingText').innerText = `Menampilkan ${textStart} - ${textEnd} dari total ${filteredPeserta.length} peserta`;
+            document.getElementById('pageIndicator').innerText = `Halaman ${currentPage} dari ${totalPages}`;
+
+            document.getElementById('btnPrev').disabled = currentPage === 1;
+            document.getElementById('btnNext').disabled = currentPage === totalPages || totalPages === 0;
+
+            const btnBulk = document.getElementById('btnBulkDownload');
+            if(filteredPeserta.length > 0) {
+                btnBulk.disabled = false;
+                document.getElementById('bulkDownloadText').innerText = `Download ZIP (${filteredPeserta.length})`;
+            } else {
+                btnBulk.disabled = true;
+                document.getElementById('bulkDownloadText').innerText = `Download ZIP (0)`;
+            }
+        }
+
+        function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+        function nextPage() { const totalPages = Math.ceil(filteredPeserta.length / rowsPerPage); if (currentPage < totalPages) { currentPage++; renderTable(); } }
+
+        // ====== FUNGSI SINGLE QR ======
+        function showQR(kta, nama, wilayah) {
+            document.getElementById('qrModal').classList.remove('hidden');
+            document.getElementById('qrNamaPeserta').innerText = nama;
+            document.getElementById('qrKtaBadge').innerText = `KTA: ${kta}`;
+            document.getElementById('qrWilayah').innerText = wilayah;
+            document.getElementById('qrModal').setAttribute('data-kta', kta);
+            
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; 
+            
+            new QRCode(qrContainer, { text: kta, width: 220, height: 220, colorDark : "#0f172a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+        }
+
+        function closeModal() { document.getElementById('qrModal').classList.add('hidden'); }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if(canvas) {
+                const kta = document.getElementById('qrModal').getAttribute('data-kta');
+                const nama = document.getElementById('qrNamaPeserta').innerText;
+                const url = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `KTA_${kta}_${nama.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // ====== BUG FIX: FUNGSI BULK DOWNLOAD (ZIP) ======
+        async function downloadBulkQR() {
+            if(filteredPeserta.length === 0) return;
+
+            const modal = document.getElementById('progressModal');
+            const progressText = document.getElementById('progressText');
+            const progressBar = document.getElementById('progressBar');
+            modal.classList.remove('hidden');
+
+            const zip = new JSZip();
+            
+            // BUG FIX: Buat div tersembunyi namun disematkan ke DOM agar Canvas ter-render dengan sempurna
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            document.body.appendChild(tempContainer);
+
+            const total = filteredPeserta.length;
+
+            try {
+                for (let i = 0; i < total; i++) {
+                    const p = filteredPeserta[i];
+                    tempContainer.innerHTML = ''; // Bersihkan container tiap iterasi
+                    
+                    const kta = (p.kta || "-").toString();
+                    const nama = (p.nama || "TanpaNama").toString();
+                    const wilayah = (p.wilayah || "Umum").toString();
+
+                    new QRCode(tempContainer, {
+                        text: kta,
+                        width: 300, 
+                        height: 300,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+
+                    // Jeda 1 milidetik agar Browser punya waktu untuk menggambar Canvas (Anti Blank Image)
+                    await new Promise(resolve => setTimeout(resolve, 1));
+
+                    const canvas = tempContainer.querySelector('canvas');
+                    if (canvas) {
+                        const base64Data = canvas.toDataURL('image/png').split(',')[1];
+                        
+                        // Bersihkan nama file dari karakter ilegal seperti / \ : * ? " < > |
+                        const cleanName = nama.replace(/[^a-zA-Z0-9]/g, '_'); 
+                        const cleanWilayah = wilayah.replace(/[^a-zA-Z0-9]/g, '_');
+                        
+                        const fileName = `${cleanWilayah}_${kta}_${cleanName}.png`;
+                        zip.file(fileName, base64Data, {base64: true});
+                    }
+
+                    // Update UI tiap 5 item agar progress bar mulus dan browser tidak freeze
+                    if (i % 5 === 0 || i === total - 1) {
+                        const percent = Math.round(((i + 1) / total) * 100);
+                        progressText.innerText = `Men-generate QR Code ${i + 1} dari ${total}...`;
+                        progressBar.style.width = `${percent}%`;
+                    }
+                }
+
+                progressText.innerText = "Mengemas file ke dalam format .ZIP... Mohon tunggu.";
+                await new Promise(resolve => setTimeout(resolve, 100)); // Beri waktu UI untuk update teks
+
+                const content = await zip.generateAsync({type:"blob"});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                
+                const filterWilayah = document.getElementById('wilayahFilter').value;
+                const zipName = filterWilayah ? `QR_Code_Wilayah_${filterWilayah}.zip` : `QR_Code_Semua_Peserta.zip`;
+                
+                link.download = zipName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+            } catch(e) {
+                alert("Terjadi kesalahan saat memproses file ZIP. Pastikan memori browser cukup.");
+                console.error(e);
+            } finally {
+                // Wajib bersihkan elemen tersembunyi
+                if(document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+                modal.classList.add('hidden');
+                progressBar.style.width = "0%";
+            }
+        }
+    </script>
+</body>
+</html>

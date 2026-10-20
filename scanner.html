@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Panitia - EventGate</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML5-QRCode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Memperbaiki tampilan default library scanner */
+        #reader { border: none !important; border-radius: 12px; overflow: hidden; background: white; }
+        #reader__dashboard_section_csr span { color: #475569; font-size: 14px; }
+        #reader button { background-color: #dc2626; color: white; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; margin-top:10px; transition: 0.2s; }
+        #reader button:hover { background-color: #b91c1c; }
+        #reader select { padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; margin-bottom: 10px; width: 100%; max-width: 300px;}
+        #reader__dashboard_section_swaplink { text-decoration: none; color: #dc2626; font-weight: 500; margin-top: 10px; display: inline-block;}
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pt-20 pb-8 px-4">
+
+    <!-- Full-width Top Navigation -->
+    <nav class="bg-white border-b border-gray-200 fixed w-full z-50 top-0 left-0 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center gap-2">
+                    <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">E</div>
+                    <span class="font-bold text-xl text-slate-800">Event<span class="text-red-600">Gate</span></span>
+                </div>
+                <div class="flex space-x-2 md:space-x-4">
+                    <a href="index.html" class="text-slate-600 hover:bg-slate-100 hover:text-slate-900 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition">Daftar Peserta</a>
+                    <a href="scanner.html" class="bg-red-50 text-red-700 px-3 md:px-4 py-2 rounded-md text-sm font-semibold transition">Scanner Masuk</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-md mx-auto mt-4 md:mt-8">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+            <h1 class="text-xl font-bold text-slate-800 mb-2">Scanner Kehadiran</h1>
+            <p class="text-sm text-slate-500 mb-6">Arahkan kamera ke QR Code peserta atau input manual jika QR rusak.</p>
+            
+            <!-- Tempat Kamera Scanner -->
+            <div class="bg-slate-100 p-2 rounded-xl mb-6 shadow-inner">
+                <div id="reader" class="w-full"></div>
+            </div>
+
+            <!-- Fitur Plan B: Input Manual -->
+            <div class="mb-6 flex gap-2">
+                <input type="text" id="manualKtaInput" placeholder="Ketik KTA manual..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm">
+                <button onclick="submitManual()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-medium transition text-sm whitespace-nowrap">
+                    Submit
+                </button>
+            </div>
+
+            <!-- Pesan / Notifikasi Hasil Scan -->
+            <div id="resultBox" class="hidden p-4 rounded-xl text-left border transition-all duration-300">
+                <div class="flex items-center gap-3 mb-1">
+                    <span id="resultIcon"></span>
+                    <h3 id="resultTitle" class="font-bold text-lg"></h3>
+                </div>
+                <p id="resultMessage" class="text-sm ml-9"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // GANTI DENGAN URL APLIKASI WEB ANDA
+        // ==========================================
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyo1Uuvd4sRG7sdHW0CHbCrNs3lEUbNOUm8ey53oGbLRBB2K0iUYRMSrGfZrg4Nmo0J/exec'; 
+
+        let isProcessing = false;
+        let lastScanned = "";
+
+        // Setup Scanner Kamera
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: {width: 250, height: 250},
+            rememberLastUsedCamera: true,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        }, false);
+
+        // Fungsi yang dipanggil saat QR terbaca oleh kamera
+        function onScanSuccess(decodedText, decodedResult) {
+            // Cegah scan ganda secara tidak sengaja
+            if (decodedText === lastScanned) return;
+            lastScanned = decodedText;
+            
+            // Hapus cache lastScanned setelah 4 detik
+            setTimeout(() => { lastScanned = ""; }, 4000);
+
+            // Proses data KTA
+            processKTA(decodedText);
+        }
+
+        // Fungsi untuk Input Manual
+        function submitManual() {
+            const inputVal = document.getElementById('manualKtaInput').value.trim();
+            if(!inputVal) {
+                alert("Silakan masukkan Nomor KTA terlebih dahulu.");
+                return;
+            }
+            processKTA(inputVal);
+            document.getElementById('manualKtaInput').value = ""; // Kosongkan input setelah submit
+        }
+
+        // Fungsi Inti untuk mengirim data ke Spreadsheet (Bisa dipanggil dari Kamera maupun Input Manual)
+        async function processKTA(ktaText) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            showNotification('loading', 'Memproses...', `Mengecek data KTA: ${ktaText}`);
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ kta: ktaText })
+                });
+                
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    showNotification('success', 'Berhasil Hadir!', `${result.data.nama} (KTA: ${result.data.kta}) tercatat pada ${result.data.waktu}`);
+                    playAudio('success');
+                } else if (result.status === "warning") {
+                    showNotification('warning', 'Sudah Hadir', result.message + ` (${result.nama})`);
+                    playAudio('warning');
+                } else {
+                    showNotification('error', 'Gagal', result.message);
+                    playAudio('error');
+                }
+            } catch (error) {
+                showNotification('error', 'Koneksi Error', 'Gagal menghubungi server. Pastikan internet panitia stabil.');
+                playAudio('error');
+            } finally {
+                // Jeda 1.5 detik sebelum scanner bisa memproses KTA lain
+                setTimeout(() => { isProcessing = false; }, 1500);
+            }
+        }
+
+        // Mulai jalankan Scanner
+        html5QrcodeScanner.render(onScanSuccess);
+
+        // Fungsi mengatur UI Notifikasi
+        function showNotification(type, title, message) {
+            const box = document.getElementById('resultBox');
+            const icon = document.getElementById('resultIcon');
+            const titleEl = document.getElementById('resultTitle');
+            const msgEl = document.getElementById('resultMessage');
+
+            box.classList.remove('hidden', 'border-slate-200', 'bg-slate-50', 'text-slate-800', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-800', 'border-yellow-200', 'bg-yellow-50', 'text-yellow-800', 'border-red-200', 'bg-red-50', 'text-red-800');
+            
+            titleEl.innerText = title;
+            msgEl.innerText = message;
+
+            if(type === 'loading') {
+                box.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-800');
+                icon.innerHTML = `<svg class="animate-spin w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            } else if(type === 'success') {
+                box.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
+                icon.innerHTML = `<svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            } else if(type === 'warning') {
+                box.classList.add('border-yellow-200', 'bg-yellow-50', 'text-yellow-800');
+                icon.innerHTML = `<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+            } else if(type === 'error') {
+                box.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
+                icon.innerHTML = `<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            }
+        }
+
+        // Fungsi Audio (Bunyi Beep)
+        function playAudio(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                if(type === 'success') {
+                    // Nada tinggi sukses
+                    osc.frequency.setValueAtTime(800, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.1);
+                } else {
+                    // Nada rendah gagal/error
+                    osc.frequency.setValueAtTime(300, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.3);
+                }
+            } catch (e) {
+                console.log("Audio API tidak didukung di browser ini.");
+            }
+        }
+    </script>
+</body>
+</html>
